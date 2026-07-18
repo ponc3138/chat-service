@@ -20,4 +20,11 @@ def check_db_health():
                 return True
     except psycopg.DatabaseError: 
         return False
+    
 
+def create_user_db(username, email, hashed_password):
+    with pool.connection() as conn:
+        with conn.cursor() as cur: 
+            # Store usernames and emails in lowercase for consistency and uniqueness
+            cur.execute("""INSERT INTO users (username, email, hashed_password)
+                        VALUES (%s, %s, %s)""", (username.strip().lower(), email.strip().lower(), hashed_password))
