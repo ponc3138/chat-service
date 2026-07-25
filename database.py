@@ -48,3 +48,11 @@ def get_user_by_id_db(user_id):
                                   FROM users
                                   WHERE id = (%s) """, (user_id, ))
              return result.fetchone()
+
+def create_room_db(room_name):
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur: 
+            result = cur.execute("""INSERT INTO rooms (room_name)
+                        VALUES (%s)
+                        RETURNING id, room_name""", (room_name.strip(), ))
+            return result.fetchone()
