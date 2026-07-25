@@ -56,3 +56,19 @@ def create_room_db(room_name):
                         VALUES (%s)
                         RETURNING id, room_name""", (room_name.strip(), ))
             return result.fetchone()
+        
+def join_room_db(user_id, room_id):
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            result = cur.execute(""" INSERT INTO room_users (user_id, room_id)
+                        VALUES (%s, %s) 
+                        RETURNING user_id, room_id""", (user_id, room_id))
+            return result.fetchone()
+        
+def get_room_by_id_db(id):
+     with pool.connection() as conn:
+         with conn.cursor(row_factory=dict_row) as cur:
+             result = cur.execute(""" SELECT *
+                                  FROM rooms
+                                  WHERE id = (%s) """, (id, ))
+             return result.fetchone()
