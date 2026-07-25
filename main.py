@@ -1,6 +1,6 @@
 from typing_extensions import Annotated
 from fastapi import FastAPI, HTTPException, Depends
-from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db
+from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db, join_room_db, get_room_by_id_db
 from pydantic import AfterValidator, BaseModel, EmailStr
 from pwdlib import PasswordHash
 import psycopg
@@ -139,3 +139,19 @@ def create_room(room : Room, _user : dict = Depends(get_current_user)):
         return created_room
     except psycopg.errors.UniqueViolation:
         raise HTTPException(status_code=409, detail="Room name already used")
+
+@app.post("/rooms/{id}/join", status_code=201)
+def join_room(id : int, user : dict = Depends(get_current_user)):
+    try:
+        join_room_db(user['id'], id)
+        room = get_room_by_id_db(id)
+        return {"message" : "Successfully joined room", 
+                "room" : room
+                }
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="User already in room")        
+    except psycopg.errors.ForeignKeyViolation:
+        raise HTTPException(status_code=404, detail="Room does not exist")
+    except psycopg.Error as e:
+        print(f"error {e}")
+        raise HTTPException(status_code=500, detail="Server error")
