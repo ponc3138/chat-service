@@ -1,6 +1,7 @@
+from typing_extensions import Annotated
 from fastapi import FastAPI, HTTPException, Depends
-from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db
-from pydantic import BaseModel, EmailStr
+from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db
+from pydantic import AfterValidator, BaseModel, EmailStr
 from pwdlib import PasswordHash
 import psycopg
 import jwt
@@ -29,6 +30,15 @@ class UserPublic(BaseModel):
     id : int
     email : EmailStr
     username : str
+
+# makes sure a room name is not just white space. and returns name with all whitespace removed
+def validate_room_name(name : str):
+    if(len(name.strip()) < 1):
+        raise ValueError(f"Room name cannot be blank")
+    return name.strip()
+
+class Room(BaseModel):
+    room_name : Annotated[str, AfterValidator(validate_room_name)]
 
 def create_token(user_id):
     # token expects a 'sub' wich is the subject, or the user (can be email, username, user id...), 
@@ -120,3 +130,12 @@ def login(form_data : OAuth2PasswordRequestForm = Depends()):
 def get_me(user : dict = Depends(get_current_user)):
     # gets user information from get_current_user, and returns it 
     return user
+
+
+@app.post("/rooms", status_code=201)
+def create_room(room : Room, _user : dict = Depends(get_current_user)):
+    try:
+        created_room = create_room_db(room.room_name)
+        return created_room
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="Room name already used")
