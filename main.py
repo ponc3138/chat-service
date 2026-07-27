@@ -1,6 +1,6 @@
 from typing_extensions import Annotated
 from fastapi import FastAPI, HTTPException, Depends
-from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db, join_room_db, get_room_by_id_db
+from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db, join_room_db, get_room_by_id_db, get_user_rooms_db
 from pydantic import AfterValidator, BaseModel, EmailStr
 from pwdlib import PasswordHash
 import psycopg
@@ -154,4 +154,13 @@ def join_room(id : int, user : dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Room does not exist")
     except psycopg.Error as e:
         print(f"error {e}")
+        raise HTTPException(status_code=500, detail="Server error")
+
+@app.get("/rooms")
+def get_rooms(user : dict = Depends(get_current_user)):
+    try: 
+        rooms = get_user_rooms_db(user['id'])
+        return {"rooms" : rooms}
+    except psycopg.Error as e:
+        print(e)
         raise HTTPException(status_code=500, detail="Server error")

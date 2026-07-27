@@ -72,3 +72,12 @@ def get_room_by_id_db(id):
                                   FROM rooms
                                   WHERE id = (%s) """, (id, ))
              return result.fetchone()
+
+def get_user_rooms_db(user_id):
+     with pool.connection() as conn:
+         with conn.cursor(row_factory=dict_row) as cur:
+             result = cur.execute(""" SELECT room_users.room_id, rooms.room_name
+                                  FROM room_users
+                                  INNER JOIN rooms on room_users.room_id = rooms.id
+                                  WHERE room_users.user_id = (%s) """, (user_id, ))
+             return result.fetchall()
