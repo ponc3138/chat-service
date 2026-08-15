@@ -81,3 +81,26 @@ def get_user_rooms_db(user_id):
                                   INNER JOIN rooms on room_users.room_id = rooms.id
                                   WHERE room_users.user_id = (%s) """, (user_id, ))
              return result.fetchall()
+
+def create_message_db(user_id, room_id, content):
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            result = cur.execute(""" INSERT INTO messages (user_id, room_id, content)
+                VALUES (%s, %s, %s)
+                RETURNING user_id, room_id, content""", (user_id, room_id, content))
+            return result.fetchone()
+
+def get_room_and_membership_db(room_id, user_id):
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            # Return the room if it exists, along with whether the given user
+            # is a member of that room. 
+            result = cur.execute(""" SELECT rooms.id AS room_id, rooms.room_name,
+                (room_users.user_id IS NOT NULL) AS is_member
+                FROM rooms
+                -- LEFT JOIN keeps the room in the result even if the user
+                -- has not joined it, allowing us to distinguish between
+                -- "room doesn't exist" and "user isn't a member".
+                LEFT JOIN room_users ON room_users.room_id = rooms.id and room_users.user_id = %s
+                WHERE rooms.id = %s """, (user_id, room_id))
+            return result.fetchone()

@@ -1,7 +1,7 @@
 from typing_extensions import Annotated
 from fastapi import FastAPI, HTTPException, Depends
-from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db, join_room_db, get_room_by_id_db, get_user_rooms_db
-from pydantic import AfterValidator, BaseModel, EmailStr
+from database import check_db_health, create_user_db, get_user_db, get_user_by_id_db, create_room_db, join_room_db, get_room_by_id_db, get_user_rooms_db, create_message_db, get_room_and_membership_db
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator
 from pwdlib import PasswordHash
 import psycopg
 import jwt
@@ -39,6 +39,16 @@ def validate_room_name(name : str):
 
 class Room(BaseModel):
     room_name : Annotated[str, AfterValidator(validate_room_name)]
+
+class MessageCreate(BaseModel):
+    content : str = Field(max_length=2000)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value : str) -> str:
+        if(not value.strip()):
+            raise ValueError("Message cannot be empty")
+        return value
 
 def create_token(user_id):
     # token expects a 'sub' wich is the subject, or the user (can be email, username, user id...), 
@@ -161,6 +171,22 @@ def get_rooms(user : dict = Depends(get_current_user)):
     try: 
         rooms = get_user_rooms_db(user['id'])
         return {"rooms" : rooms}
+    except psycopg.Error as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Server error")
+
+@app.post("/rooms/{room_id}/messages")
+def write_message(room_id : int, message : MessageCreate, user : dict = Depends(get_current_user)):
+    try:
+        room_info = get_room_and_membership_db(room_id, user['id'])
+
+        if(room_info is None):
+            raise HTTPException(status_code=404, detail="Room does not exist")
+        if(not room_info['is_member']):
+            raise HTTPException(status_code=403, detail="User not in room")
+        
+        message_info = create_message_db(user['id'], room_id, message.content)
+        return message_info
     except psycopg.Error as e:
         print(e)
         raise HTTPException(status_code=500, detail="Server error")
